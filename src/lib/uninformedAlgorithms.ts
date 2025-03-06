@@ -1,3 +1,14 @@
+// Define GraphNode type
+interface GraphNode {
+  value: number;
+  neighbors: GraphNode[];
+}
+
+// Define Graph type
+interface Graph {
+  nodes: Map<number, GraphNode>;
+}
+
 // Priority Queue for UCS
 class PriorityQueue<T> {
 	private items: { item: T; priority: number }[] = [];
@@ -90,26 +101,69 @@ function iddfs(graph: Record<string, string[]>, start: string, goal: string, max
 }
 
 // Bidirectional Search
-function bidirectionalSearch(graph: Record<string, string[]>, start: string, goal: string): string[] | null {
+function bidirectionalSearch(graph: Record<string, string[]>, start: string, goal: string): { forwardPath: string[]; backwardPath: string[]; intersection: string } | null {
 	let forwardQueue: [string, string[]][] = [[start, [start]]];
 	let backwardQueue: [string, string[]][] = [[goal, [goal]]];
-	let forwardVisited = new Set<string>();
-	let backwardVisited = new Set<string>();
+	let forwardVisited = new Map<string, string>(); // node -> parent
+	let backwardVisited = new Map<string, string>(); // node -> parent
+	let intersection: string | null = null;
 
-	while (forwardQueue.length > 0 && backwardQueue.length > 0) {
+	if (start === goal) return { forwardPath: [start], backwardPath: [goal], intersection: start };
+
+	forwardVisited.set(start, '');
+	backwardVisited.set(goal, '');
+
+	while (forwardQueue.length > 0 && backwardQueue.length > 0 && !intersection) {
+		// Forward search step
 		let [fNode, fPath] = forwardQueue.shift()!;
+		for (let neighbor of graph[fNode] || []) {
+			if (!forwardVisited.has(neighbor)) {
+				forwardVisited.set(neighbor, fNode);
+				forwardQueue.push([neighbor, [...fPath, neighbor]]);
+				if (backwardVisited.has(neighbor)) {
+					intersection = neighbor;
+					break;
+				}
+			}
+		}
+
+		if (intersection) break;
+
+		// Backward search step
 		let [bNode, bPath] = backwardQueue.shift()!;
-
-		if (backwardVisited.has(fNode)) return fPath;
-		if (forwardVisited.has(bNode)) return bPath.reverse();
-
-		forwardVisited.add(fNode);
-		backwardVisited.add(bNode);
-
-		for (let neighbor of graph[fNode] || []) forwardQueue.push([neighbor, [...fPath, neighbor]]);
-		for (let neighbor of graph[bNode] || []) backwardQueue.push([neighbor, [...bPath, neighbor]]);
+		for (let neighbor of graph[bNode] || []) {
+			if (!backwardVisited.has(neighbor)) {
+				backwardVisited.set(neighbor, bNode);
+				backwardQueue.push([neighbor, [...bPath, neighbor]]);
+				if (forwardVisited.has(neighbor)) {
+					intersection = neighbor;
+					break;
+				}
+			}
+		}
 	}
-	return null;
+
+	if (!intersection) return null;
+
+	// Reconstruct forward path
+	const forwardPath: string[] = [];
+	let current = intersection;
+	while (current) {
+		forwardPath.unshift(current);
+		current = forwardVisited.get(current)!;
+		if (!current) break;
+	}
+
+	// Reconstruct backward path
+	const backwardPath: string[] = [];
+	current = intersection;
+	while (current) {
+		backwardPath.push(current);
+		current = backwardVisited.get(current)!;
+		if (!current) break;
+	}
+
+	return { forwardPath, backwardPath, intersection };
 }
 
 export { bfs, dfs, dls, ucs, iddfs, bidirectionalSearch };
